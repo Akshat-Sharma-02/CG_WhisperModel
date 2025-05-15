@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Whisper Multilingual Transcriber</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-100 text-center p-8">
+    <h1 class="text-3xl font-bold mb-6">🎙️ Whisper Multilingual Transcriber</h1>
+
+    <!-- Upload Section -->
+    <div class="mb-6">
+      <input type="file" id="fileInput" class="mb-2 p-2 border rounded" />
+      <button
+        onclick="uploadFile()"
+        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded ml-2 transition-opacity duration-300"
+      >
+        Upload & Transcribe
+      </button>
+    </div>
+
+    <!-- Recording Section -->
+    <div class="mb-6">
+      <button
+        id="startBtn"
+        onclick="startRecording()"
+        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded transition-opacity duration-300"
+      >
+        🔴 Start Recording
+      </button>
+      <button
+        id="stopBtn"
+        onclick="stopRecording()"
+        class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded ml-2 opacity-50 transition-opacity duration-300"
+      >
+        ⏹️ Stop & Transcribe
+      </button>
+    </div>
+
+    <!-- Result Display -->
+    <p
+      id="result"
+      class="bg-white p-4 rounded shadow w-2/3 mx-auto text-left whitespace-pre-wrap"
+    ></p>
+    <button
+      id="downloadBtn"
+      onclick="downloadTranscript()"
+      class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded mt-4 hidden"
+    >
+      ⬇️ Download Transcript
+    </button>
+
+    <!-- Script -->
+    <script>
+      let mediaRecorder;
+      let audioChunks = [];
+      let latestTranscript = "";
+
+      function startRecording() {
+        navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+          mediaRecorder = new MediaRecorder(stream);
+          mediaRecorder.start();
+
+          document.getElementById("startBtn").classList.add("opacity-50");
+          document.getElementById("stopBtn").classList.remove("opacity-50");
+
+          mediaRecorder.ondataavailable = (event) =>
+            audioChunks.push(event.data);
+
+          mediaRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+            const formData = new FormData();
+            formData.append("audio", audioBlob, "recording.webm");
+
+            fetch("/transcribe", {
+              method: "POST",
+              body: formData,
+            })
+              .then((res) => res.json())
+              .then((data) => {
+                latestTranscript = data.transcript;
+                document.getElementById(
+                  "result"
+                ).innerText = `🌐 Language: ${data.language}\n📝 Transcript:\n${data.transcript}`;
+                document
+                  .getElementById("downloadBtn")
+                  .classList.remove("hidden");
+              });
+
+            audioChunks = [];
+          };
+        });
+      }
+
+      function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state !== "inactive") {
+          mediaRecorder.stop();
+
+          document.getElementById("startBtn").classList.remove("opacity-50");
+          document.getElementById("stopBtn").classList.add("opacity-50");
+        }
+      }
+
+      function uploadFile() {
+        const file = document.getElementById("fileInput").files[0];
+        const formData = new FormData();
+        formData.append("audio", file);
+
+        fetch("/transcribe", {
+          method: "POST",
+          body: formData,
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            latestTranscript = data.transcript;
+            document.getElementById(
+              "result"
+            ).innerText = `🌐 Language: ${data.language}\n📝 Transcript:\n${data.transcript}`;
+            document.getElementById("downloadBtn").classList.remove("hidden");
+          });
+      }
+
+      function downloadTranscript() {
+        const blob = new Blob([latestTranscript], { type: "text/plain" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "transcript.txt";
+        a.click();
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,8 @@
+flask==2.2.5
+openai-whisper
+pydub
+ffmpeg-python
+numpy==1.26.4
+pillow==10.2.0
+packaging==23.2
+werkzeug==2.2.3
